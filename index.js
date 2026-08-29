@@ -1,10 +1,21 @@
 const express = require('express');
 
 const app = express();
-const port = 5000;
+const port = process.env.PORT || 5000;
 
 // Middleware
 app.use(express.json());
+
+const getUserId = (value) => {
+  const id = Number(value);
+  return Number.isInteger(id) && id > 0 ? id : null;
+};
+
+const isValidUser = ({ name, email } = {}) =>
+  typeof name === 'string' &&
+  name.trim().length > 0 &&
+  typeof email === 'string' &&
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 // Temporary users data
 let users = [
@@ -32,7 +43,11 @@ app.get('/users', (req, res) => {
 
 app.get('/users/:id', (req, res) => {
 
-  const userId = parseInt(req.params.id);
+  const userId = getUserId(req.params.id);
+
+  if (userId === null) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
 
   const user = users.find((u) => u.id === userId);
 
@@ -51,10 +66,16 @@ app.get('/users/:id', (req, res) => {
 
 app.post('/users', (req, res) => {
 
+  if (!isValidUser(req.body)) {
+    return res.status(400).json({
+      message: 'A valid name and email are required'
+    });
+  }
+
   const newUser = {
-    id: users.length + 1,
-    name: req.body.name,
-    email: req.body.email
+    id: users.reduce((maxId, user) => Math.max(maxId, user.id), 0) + 1,
+    name: req.body.name.trim(),
+    email: req.body.email.trim()
   };
 
   users.push(newUser);
@@ -71,14 +92,24 @@ app.post('/users', (req, res) => {
 
 app.put('/users/:id', (req, res) => {
 
-  const userId = parseInt(req.params.id);
+  const userId = getUserId(req.params.id);
+
+  if (userId === null) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
+
+  if (!isValidUser(req.body)) {
+    return res.status(400).json({
+      message: 'A valid name and email are required'
+    });
+  }
 
   const user = users.find((u) => u.id === userId);
 
   if (user) {
 
-    user.name = req.body.name;
-    user.email = req.body.email;
+    user.name = req.body.name.trim();
+    user.email = req.body.email.trim();
 
     res.json({
       message: 'User updated successfully',
@@ -100,7 +131,11 @@ app.put('/users/:id', (req, res) => {
 
 app.delete('/users/:id', (req, res) => {
 
-  const userId = parseInt(req.params.id);
+  const userId = getUserId(req.params.id);
+
+  if (userId === null) {
+    return res.status(400).json({ message: 'Invalid user ID' });
+  }
 
   const userIndex = users.findIndex((u) => u.id === userId);
 
@@ -125,6 +160,10 @@ app.delete('/users/:id', (req, res) => {
 
 // START SERVER
 
-app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
-});
+if (require.main === module) {
+  app.listen(port, () => {
+    console.log(`Server running on http://localhost:${port}`);
+  });
+}
+
+module.exports = app;
